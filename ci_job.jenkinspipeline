@@ -1,0 +1,52 @@
+pipeline {
+  agent any
+  parameters {
+    string defaultValue: 'master', description: 'Enter target branch', name: 'Target_Branch'
+    choice choices: ['---Select---', 'Dev', 'Stag', 'Prod'], description: 'Select environment', name: 'Environment'
+    booleanParam defaultValue: false, description: 'Please select the deploy', name: 'Deploy'
+  }
+
+  stages {
+    stage("Parameters") {
+
+      steps {
+        sh label: '', script: 'echo "This is parameter stage "'
+        echo "${params.Target_Branch}"
+        echo "${params.Environment}"
+        echo "${params.Deploy}"
+
+      }
+    }
+
+    stage("SCM") {
+      steps {
+        git branch: '$Target_Branch', changelog: false, credentialsId: 'github_credentials', poll: false, url: 'https://github.com/psddevops/sampletest.git'
+      }
+    }
+
+    stage("BUILD") {
+      steps {
+        sh 'mvn clean package'
+      }
+      post {
+        success {
+          junit testResults: '**/target/surefire-reports/*.xml', allowEmptyResults: false
+          slackSend color: "#439FE0", message: "Build Success: ${JOB_NAME} and ${BUILD_URL}"
+        }
+        failure {
+          slackSend color: "#439FE0", message: "Build Failure: ${JOB_NAME} and ${BUILD_URL}"
+        }
+      }
+    }
+    stage("calling_cd_job") {
+      steps {
+        sh 'echo "calling cd job ...."'
+        build(job: "cd_job", parameters: [string(name: 'Environment', value: "${params.Environment}"),
+          string(name: 'Target_Branch', value: "${params.Target_Branch}"),
+          string(name: 'Deploy', value: "${params.Deploy}")
+        ])
+        sh 'echo "cd job completed successfully...."'
+      }
+    }
+  }
+}

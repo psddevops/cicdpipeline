@@ -1,0 +1,48 @@
+pipeline {
+  agent any
+  parameters {
+    string 'Environment'
+    string 'Target_Branch'
+    string 'Deploy'
+  }
+  stages {
+    stage("Sonar") {
+      steps {
+        sh 'echo "This is sonar stage...."'
+      }
+    }
+    stage("QG") {
+      steps {
+        sh 'echo "This is Sonar QG stage...."'
+      }
+    }
+    stage("Nexus") {
+      steps {
+        sh 'echo "This is nexus stage...."'
+      }
+    }
+    stage("Deploy") {
+      when {
+        expression {
+          params.Target_Branch == "batch_17" && params.Deploy == "true"
+        }
+      }
+      steps {
+        sh 'scp -o StrictHostKeyChecking=no -r /var/lib/jenkins/workspace/ci_job/target/*.war ubuntu@3.83.43.129:/opt/tomcat/webapps'
+      }
+      post {
+        success {
+          sh 'echo "Deployment successfully completed ...."'
+          slackSend color: "#439FE0", message: "Job Success: ${JOB_NAME} and ${BUILD_URL}"
+
+        }
+        failure {
+          sh 'echo "Deployment successfully not completed ...."'
+          slackSend color: "#439FE0", message: "Job Failure: ${JOB_NAME} and ${BUILD_URL}"
+        }
+      }
+    }
+
+  }
+
+}
